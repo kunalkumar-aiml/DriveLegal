@@ -105,29 +105,26 @@ export function AIAssistantScreen() {
         countryCode: 'IN',
       });
 
+      const summary = [
+        `Offense: ${entities.Offense}`,
+        `Vehicle Type: ${entities['Vehicle Type']}`,
+        `State: ${entities.State}`,
+        '',
+        `Estimated Fine: ₹${fineBreakdown.exactFineAmount}`,
+        `Legal Section: ${fineBreakdown.legalSection}`,
+        `Base Penalty: ₹${fineBreakdown.basePenalty}`,
+        `State Adjusted: ₹${fineBreakdown.stateAdjustedPenalty}`,
+        `Vehicle Multiplier: x${fineBreakdown.multiplierApplied}`,
+        `Vehicle Escalation: ₹${fineBreakdown.vehicleEscalation}`,
+        '',
+        `Consequence: ${fineBreakdown.legalConsequences}`,
+      ].join('\n');
+
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
-          text: JSON.stringify(entities, null, 2),
-        },
-        {
-          role: 'assistant',
-          text: JSON.stringify(
-            {
-              exactFineAmount: fineBreakdown.exactFineAmount,
-              legalSection: fineBreakdown.legalSection,
-              legalConsequences: fineBreakdown.legalConsequences,
-              applied: {
-                basePenalty: fineBreakdown.basePenalty,
-                stateAdjustedPenalty: fineBreakdown.stateAdjustedPenalty,
-                multiplierApplied: fineBreakdown.multiplierApplied,
-                vehicleEscalation: fineBreakdown.vehicleEscalation,
-              },
-            },
-            null,
-            2
-          ),
+          text: summary,
         },
       ]);
       setScenario('');
@@ -195,8 +192,8 @@ export function AIAssistantScreen() {
             <Text style={styles.cardTitle}>Structured Entity Extraction</Text>
           </View>
 
-          <Text style={styles.body}>Enter a scenario and extract exactly three JSON entities:</Text>
-          <Text style={styles.schema}>{'{"Offense":"...","Vehicle Type":"...","State":"..."}'}</Text>
+          <Text style={styles.body}>Enter a scenario to extract offense, vehicle type, state, and challan estimate.</Text>
+          <Text style={styles.schema}>Result format: simple readable summary (not JSON).</Text>
 
           <View style={styles.languageRow}>
             {SUPPORTED_STT_LANGUAGES.map((language) => (

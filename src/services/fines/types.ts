@@ -20,6 +20,13 @@ export type FineBreakdown = {
   notes: string[];
 };
 
+export type CommonFineEstimate = {
+  offense: string;
+  exactFineAmount: number;
+  legalSection: string;
+  legalConsequences: string;
+};
+
 export type BaseFineRow = {
   id: number;
   country_code: string;

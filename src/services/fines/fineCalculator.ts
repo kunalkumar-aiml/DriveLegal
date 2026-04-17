@@ -1,5 +1,6 @@
 import {
   BaseFineRow,
+  CommonFineEstimate,
   FineBreakdown,
   FineEntityInput,
   StateRuleRow,
@@ -137,4 +138,32 @@ export async function calculateFineForEntities(input: FineEntityInput): Promise<
     legalConsequences,
     notes,
   };
+}
+
+const COMMON_OFFENSES = ['No Helmet', 'No Seatbelt', 'No PUCC', 'Overspeeding'] as const;
+
+export async function calculateCommonFinesForState(input: {
+  state: string;
+  vehicleType: string;
+  countryCode?: string;
+}): Promise<CommonFineEstimate[]> {
+  const results = await Promise.all(
+    COMMON_OFFENSES.map(async (offense) => {
+      const breakdown = await calculateFineForEntities({
+        offense,
+        state: input.state,
+        vehicleType: input.vehicleType,
+        countryCode: input.countryCode,
+      });
+
+      return {
+        offense,
+        exactFineAmount: breakdown.exactFineAmount,
+        legalSection: breakdown.legalSection,
+        legalConsequences: breakdown.legalConsequences,
+      };
+    })
+  );
+
+  return results;
 }

@@ -1,5 +1,18 @@
 type RulesByState = Record<string, string[]>;
 
+const indiaStateCodeToName: Record<string, string> = {
+  AP: 'Andhra Pradesh',
+  DL: 'Delhi',
+  GJ: 'Gujarat',
+  KA: 'Karnataka',
+  MH: 'Maharashtra',
+  RJ: 'Rajasthan',
+  TN: 'Tamil Nadu',
+  TS: 'Telangana',
+  UP: 'Uttar Pradesh',
+  WB: 'West Bengal',
+};
+
 const rulesByState: RulesByState = {
   CA: [
     'Hands-free only while driving; avoid touching your phone.',
@@ -108,3 +121,16 @@ export function resolveRegionCode(region?: string | null): string | undefined {
   const normalized = region.toLowerCase().replace(/[^a-z]/g, '');
   return indianRegionNameToCode[normalized];
 }
+
+export function getStateNameFromCode(stateCode?: string | null): string | undefined {
+  if (!stateCode) {
+    return undefined;
+  }
+
+  return indiaStateCodeToName[stateCode.toUpperCase()];
+}
+
+export const INDIA_STATE_OPTIONS = Object.entries(indiaStateCodeToName).map(([code, name]) => ({
+  code,
+  name,
+}));
