@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -13,18 +13,78 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
+        "NSLocationWhenInUseUsageDescription": "DriveLegal uses your location to show local road safety context.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveLegal tracks location in background to detect state border crossings and refresh traffic rules.",
+        "NSLocationAlwaysUsageDescription": "DriveLegal tracks location in background to detect state border crossings and refresh traffic rules.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access microphone for voice scenario capture.",
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to transcribe speech for offline safety analysis."
+      },
+      "bundleIdentifier": "com.anonymous.DriveLegal"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "RECORD_AUDIO",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.DriveLegal"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "DriveLegal uses your location to show current state traffic rules.",
+          "locationAlwaysAndWhenInUsePermission": "DriveLegal uses background location to detect border crossings and update traffic rules.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#0EA5E9"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access microphone for voice scenario capture.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to transcribe speech for offline safety analysis.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.as"
+          ]
+        }
+      ],
+      "expo-sqlite"
+    ]
   }
 }
