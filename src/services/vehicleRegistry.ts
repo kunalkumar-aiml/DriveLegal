@@ -84,8 +84,12 @@ const registryData: VehicleRecord[] = [
   },
 ];
 
-function normalizeRegistrationNumber(value: string) {
+export function normalizeRegistrationNumber(value: string) {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+export function getAllLocalVehicleRecords() {
+  return [...registryData];
 }
 
 export function lookupVehicleByNumber(registrationNumber: string): VehicleRecord | null {

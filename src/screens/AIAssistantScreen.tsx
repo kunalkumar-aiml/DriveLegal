@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import { GlassCard } from '../components/GlassCard';
 import { calculateFineForEntities } from '../services/fines/fineCalculator';
 import { initializeFineDatabase } from '../services/fines/localFineDatabase';
 import {
+  draftLegalDisputeLetter,
   disposeOfflineNlpSession,
   extractOffenseEntities,
   loadLocalInt4Model,
@@ -38,6 +40,18 @@ export function AIAssistantScreen() {
   const [recording, setRecording] = useState(false);
   const [selectedLocale, setSelectedLocale] = useState<SupportedSttLocale>('hi-IN');
   const [error, setError] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftLetter, setDraftLetter] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [latestEstimate, setLatestEstimate] = useState<{
+    offense: string;
+    vehicleType: string;
+    state: string;
+    exactFineAmount: number;
+    legalSection: string;
+    legalConsequences: string;
+  } | null>(null);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -120,6 +134,18 @@ export function AIAssistantScreen() {
         `Consequence: ${fineBreakdown.legalConsequences}`,
       ].join('\n');
 
+      setLatestEstimate({
+        offense: entities.Offense,
+        vehicleType: entities['Vehicle Type'],
+        state: entities.State,
+        exactFineAmount: fineBreakdown.exactFineAmount,
+        legalSection: fineBreakdown.legalSection,
+        legalConsequences: fineBreakdown.legalConsequences,
+      });
+      setDraftLetter(null);
+      setDraftError(null);
+      setCopied(false);
+
       setMessages((current) => [
         ...current,
         {
@@ -133,6 +159,38 @@ export function AIAssistantScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleContestChallan = async () => {
+    if (!latestEstimate) {
+      return;
+    }
+
+    setDraftLoading(true);
+    setDraftError(null);
+    setCopied(false);
+
+    try {
+      const draft = await draftLegalDisputeLetter({
+        offense: latestEstimate.offense,
+        stateLocation: latestEstimate.state,
+      });
+
+      setDraftLetter(draft);
+    } catch {
+      setDraftError('Unable to generate dispute letter right now. Please try again.');
+    } finally {
+      setDraftLoading(false);
+    }
+  };
+
+  const handleCopyDraft = async () => {
+    if (!draftLetter) {
+      return;
+    }
+
+    await Clipboard.setStringAsync(draftLetter);
+    setCopied(true);
   };
 
   const handleExtract = async () => {
@@ -256,6 +314,51 @@ export function AIAssistantScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </GlassCard>
+
+        {latestEstimate ? (
+          <GlassCard glow={false}>
+            <Text style={styles.messageRole}>Challan Estimate</Text>
+            <Text style={styles.messageText}>Offense: {latestEstimate.offense}</Text>
+            <Text style={styles.messageText}>Vehicle Type: {latestEstimate.vehicleType}</Text>
+            <Text style={styles.messageText}>State Location: {latestEstimate.state}</Text>
+            <Text style={styles.messageText}>Estimated Fine: ₹{latestEstimate.exactFineAmount}</Text>
+            <Text style={styles.messageText}>Legal Section: {latestEstimate.legalSection}</Text>
+
+            <Pressable
+              onPress={handleContestChallan}
+              disabled={draftLoading}
+              style={({ pressed }) => [
+                styles.contestButton,
+                pressed ? styles.buttonPressed : null,
+                draftLoading ? styles.buttonDisabled : null,
+              ]}
+            >
+              {draftLoading ? (
+                <ActivityIndicator color={colors.textPrimary} />
+              ) : (
+                <Text style={styles.contestButtonText}>Contest this Challan</Text>
+              )}
+            </Pressable>
+
+            {draftError ? <Text style={styles.error}>{draftError}</Text> : null}
+          </GlassCard>
+        ) : null}
+
+        {draftLetter ? (
+          <GlassCard glow={false}>
+            <Text style={styles.messageRole}>Draft Legal Dispute</Text>
+            <Text style={styles.letterText}>{draftLetter}</Text>
+
+            <Pressable
+              onPress={handleCopyDraft}
+              style={({ pressed }) => [styles.copyButton, pressed ? styles.buttonPressed : null]}
+            >
+              <Text style={styles.copyButtonText}>Copy to Clipboard</Text>
+            </Pressable>
+
+            {copied ? <Text style={styles.copiedLabel}>Copied to clipboard.</Text> : null}
+          </GlassCard>
+        ) : null}
 
         {messages.map((message, index) => (
           <GlassCard key={`${message.role}-${index}`} glow={false}>
@@ -395,6 +498,48 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontFamily: typography.semibold,
     fontSize: 14,
+  },
+  contestButton: {
+    marginTop: 12,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34, 211, 238, 0.2)',
+    borderWidth: 1,
+    borderColor: colors.accentStrong,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contestButtonText: {
+    color: colors.textPrimary,
+    fontFamily: typography.semibold,
+    fontSize: 14,
+  },
+  letterText: {
+    color: colors.textPrimary,
+    fontFamily: typography.body,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  copyButton: {
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  copyButtonText: {
+    color: colors.textPrimary,
+    fontFamily: typography.medium,
+    fontSize: 13,
+  },
+  copiedLabel: {
+    marginTop: 8,
+    color: '#86EFAC',
+    fontFamily: typography.body,
+    fontSize: 12,
   },
   error: {
     marginTop: 10,

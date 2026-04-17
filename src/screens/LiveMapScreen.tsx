@@ -12,9 +12,12 @@ import {
 } from 'react-native';
 
 import { GlassCard } from '../components/GlassCard';
+import { CircularSafetyScore } from '../components/CircularSafetyScore';
 import { getRulesForState, getStateNameFromCode, INDIA_STATE_OPTIONS } from '../data/trafficRules';
 import { useLocation } from '../hooks/useLocation';
 import { calculateCommonFinesForState } from '../services/fines/fineCalculator';
+import { triggerDeveloperGodModeStateJump } from '../services/backgroundStateTracking';
+import { getDriverSafetySnapshot } from '../services/driverSafetyScore';
 import { colors, gradients } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -24,6 +27,10 @@ export function LiveMapScreen() {
   const [vehicleType, setVehicleType] = useState<'2-Wheeler' | 'Car' | 'Truck' | 'Bus'>('2-Wheeler');
   const [challanLoading, setChallanLoading] = useState(false);
   const [challanError, setChallanError] = useState<string | null>(null);
+  const [godModeBusy, setGodModeBusy] = useState(false);
+  const [godModeStatus, setGodModeStatus] = useState<string | null>(null);
+  const [safetyScore, setSafetyScore] = useState(100);
+  const [lastSafetyEvent, setLastSafetyEvent] = useState<string | null>(null);
   const [challans, setChallans] = useState<Array<{
     offense: string;
     exactFineAmount: number;
@@ -44,6 +51,7 @@ export function LiveMapScreen() {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const godModeTapTimestampsRef = useRef<number[]>([]);
 
   useEffect(() => {
     Animated.parallel([
@@ -80,6 +88,37 @@ export function LiveMapScreen() {
   }, [fadeIn, translateY, floatAnim]);
 
   useEffect(() => {
+    const loadSafetySnapshot = async () => {
+      const snapshot = await getDriverSafetySnapshot();
+      setSafetyScore(snapshot.score);
+
+      const latestEvent = snapshot.events[0];
+      if (!latestEvent) {
+        setLastSafetyEvent(null);
+        return;
+      }
+
+      const eventTime = new Date(latestEvent.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      setLastSafetyEvent(
+        `Latest: ${latestEvent.stateCode} at ${eventTime} (${latestEvent.speedKmph} km/h, limit ${latestEvent.speedLimitKmph} km/h)`
+      );
+    };
+
+    void loadSafetySnapshot();
+    const interval = setInterval(() => {
+      void loadSafetySnapshot();
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     const loadChallans = async () => {
       setChallanLoading(true);
       setChallanError(null);
@@ -101,6 +140,36 @@ export function LiveMapScreen() {
 
     void loadChallans();
   }, [activeState, vehicleType]);
+
+  const activateDeveloperGodMode = async () => {
+    if (godModeBusy) {
+      return;
+    }
+
+    setGodModeBusy(true);
+    setGodModeStatus(null);
+
+    try {
+      await triggerDeveloperGodModeStateJump();
+      setGodModeStatus('Developer God Mode: mock border crossing injected (MH → KA).');
+    } catch {
+      setGodModeStatus('Developer God Mode failed. Please retry.');
+    } finally {
+      setGodModeBusy(false);
+    }
+  };
+
+  const handleGodModeTap = () => {
+    const now = Date.now();
+    const recent = godModeTapTimestampsRef.current.filter((value) => now - value < 900);
+    recent.push(now);
+    godModeTapTimestampsRef.current = recent;
+
+    if (recent.length >= 3) {
+      godModeTapTimestampsRef.current = [];
+      void activateDeveloperGodMode();
+    }
+  };
 
   return (
     <LinearGradient colors={gradients.page} style={styles.container}>
@@ -142,6 +211,28 @@ export function LiveMapScreen() {
                 <Text style={styles.ruleText}>{rule}</Text>
               </View>
             ))}
+
+            <View style={styles.safetySection}>
+              <Text style={styles.safetyTitle}>Driver Safety Score</Text>
+              <View style={styles.safetyScoreRow}>
+                <CircularSafetyScore score={safetyScore} size={122} strokeWidth={10} />
+                <View style={styles.safetyTextGroup}>
+                  <Text style={styles.safetyBodyText}>
+                    Score starts at 100 and drops by 5 for overspeeding in high-penalty zones.
+                  </Text>
+                  <Text style={styles.safetyBodyTextSecondary}>
+                    {lastSafetyEvent ?? 'No recent violations detected. Keep it steady.'}
+                  </Text>
+                </View>
+              </View>
+
+              {safetyScore > 90 ? (
+                <View style={styles.rewardCard}>
+                  <Ionicons name="gift" size={16} color="#34D399" />
+                  <Text style={styles.rewardText}>Reward unlocked: You are in the top safe-driver tier.</Text>
+                </View>
+              ) : null}
+            </View>
 
             <Text style={styles.challanTitle}>Current State Challan Estimates</Text>
             <Text style={styles.challanSubtitle}>
@@ -207,6 +298,12 @@ export function LiveMapScreen() {
           </GlassCard>
         </Animated.View>
       </ScrollView>
+
+      <Pressable onPress={handleGodModeTap} style={styles.godModeFab}>
+        <Ionicons name="flash" size={14} color="rgba(255, 255, 255, 0.18)" />
+      </Pressable>
+
+      {godModeStatus ? <Text style={styles.godModeStatus}>{godModeStatus}</Text> : null}
     </LinearGradient>
   );
 }
@@ -299,6 +396,60 @@ const styles = StyleSheet.create({
     fontFamily: typography.body,
     fontSize: 13,
     lineHeight: 18,
+    flex: 1,
+  },
+  safetySection: {
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginTop: 6,
+    marginBottom: 8,
+    gap: 10,
+  },
+  safetyTitle: {
+    color: colors.textPrimary,
+    fontFamily: typography.semibold,
+    fontSize: 15,
+  },
+  safetyScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  safetyTextGroup: {
+    flex: 1,
+    gap: 8,
+  },
+  safetyBodyText: {
+    color: colors.textPrimary,
+    fontFamily: typography.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  safetyBodyTextSecondary: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  rewardCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.35)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rewardText: {
+    color: '#D1FAE5',
+    fontFamily: typography.medium,
+    fontSize: 12,
     flex: 1,
   },
   challanTitle: {
@@ -396,5 +547,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: 12,
+  },
+  godModeFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 34,
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.14)',
+  },
+  godModeStatus: {
+    position: 'absolute',
+    left: 16,
+    right: 56,
+    bottom: 42,
+    color: '#93C5FD',
+    fontFamily: typography.medium,
+    fontSize: 11,
   },
 });

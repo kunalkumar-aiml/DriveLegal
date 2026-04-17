@@ -108,6 +108,10 @@ function buildTranslationPrompt(text: string, sourceLocale: string) {
   ].join('\n');
 }
 
+function buildDraftLegalDisputePrompt(offense: string, stateLocation: string) {
+  return `Act as an expert Indian traffic lawyer. Write a short, formal legal dispute letter to the Traffic Police stating that the e-challan for ${offense} at ${stateLocation} was issued incorrectly due to a faulty ANPR camera reading. Cite relevant dispute procedures.`;
+}
+
 function fallbackTranslateToEnglish(text: string): string {
   let output = text;
 
@@ -136,6 +140,31 @@ function fallbackTranslateToEnglish(text: string): string {
   }
 
   return normalizeWhitespace(output);
+}
+
+function fallbackDraftLegalDispute(offense: string, stateLocation: string) {
+  return [
+    'To,',
+    'The Traffic Police Authority,',
+    `${stateLocation}`,
+    '',
+    'Subject: Dispute against e-Challan issued due to ANPR misread',
+    '',
+    'Respected Sir/Madam,',
+    '',
+    `I respectfully submit this representation to contest the e-challan issued for the alleged offense of ${offense} at ${stateLocation}. The challan appears to have been generated due to an incorrect Automatic Number Plate Recognition (ANPR) camera reading, and the vehicle details have likely been mismatched.`,
+    '',
+    'In terms of the applicable grievance redressal and e-challan dispute procedures made available by the State Traffic Police and National e-Challan system, I request that this challan be reviewed, the supporting ANPR image/video evidence be verified, and the incorrect entry be withdrawn if found erroneous.',
+    '',
+    'I am willing to provide supporting documents, including RC, driving licence, and location/time clarification, as required during the verification process.',
+    '',
+    'Kindly acknowledge this dispute and communicate the outcome after due verification.',
+    '',
+    'Sincerely,',
+    '[Your Name]',
+    '[Mobile Number]',
+    '[Date]',
+  ].join('\n');
 }
 
 async function ensureSessionReadyUnlocked(config?: Partial<LocalLlmConfig>) {
@@ -184,6 +213,24 @@ export async function extractOffenseEntities(userScenario: string): Promise<Stru
     const llmResponse = await nativeBridge.runInference(prompt);
 
     return parseStrictEntities(llmResponse);
+  });
+}
+
+export async function draftLegalDisputeLetter(input: {
+  offense: string;
+  stateLocation: string;
+}) {
+  return withMutex(async () => {
+    await ensureSessionReadyUnlocked();
+
+    const prompt = buildDraftLegalDisputePrompt(input.offense, input.stateLocation);
+
+    if (!nativeBridge || Platform.OS !== 'android') {
+      return fallbackDraftLegalDispute(input.offense, input.stateLocation);
+    }
+
+    const generated = await nativeBridge.runInference(prompt);
+    return generated.trim();
   });
 }
 
